@@ -12,6 +12,8 @@ test-output/
 playwright-tests/
 MIGRATION_SUMMARY.md
 PRD.md
+PROGRESS.md
+STRICT_MODE_ENHANCEMENT.md
 
 # Generated config (from cy2play init)
 cy2play.config.json
