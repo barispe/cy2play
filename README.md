@@ -1,213 +1,201 @@
-# 📄 PRD: Cy2Play (AI Test Converter) - Detailed Specification
+# 🎭 Cy2Play
 
-## 1. Product Overview
-
-### 1.1 Problem Statement
-The industry is shifting from synchronous, chain-based testing frameworks (Cypress, WebdriverIO) to asynchronous, await-based frameworks (Playwright). However, migrating existing large test suites is:
-1.  **Expensive**: Manual rewriting takes hours per file.
-2.  **Error-Prone**: Humans miss `await` keywords or incorrect selector mappings.
-3.  **Complex**: Logic patterns like "Interception" or "Custom Commands" do not map 1:1.
-
-### 1.2 Solution
-**Cy2Play** is an intelligent CLI tool that transpiles legacy test code into modern Playwright code. It is unique because it offers a **Hybrid Engine**: combining the speed/determinism of AST parsing with the reasoning capabilities of Large Language Models (LLMs), including support for local, privacy-focused models (Ollama).
-
-### 1.3 Value Proposition
-*   **For Enterprises**: Migrate 10,000 tests in a weekend without sending code to the cloud (Local LLM mode).
-*   **For Developers**: Eliminate the "grunt work" of syntax conversion.
-*   **For QA Leads**: Get an automated "Audit Report" of what changed and what needs review.
+> Intelligently convert your Cypress tests to Playwright — using AST parsing + optional AI assistance.
 
 ---
 
-## 2. Core Features & Modes
+## Why Cy2Play?
 
-### 2.1 The Three Conversion Modes
+Migrating from Cypress to Playwright is tedious:
+- **Syntax differences** — Cypress uses chainable sync-like APIs; Playwright uses `async/await`.
+- **Scale** — Large test suites can have thousands of files. Manual rewriting is slow and error-prone.
+- **Edge cases** — `cy.intercept`, custom commands, and `this` context don't map 1:1.
 
-#### 🛡️ Mode 1: `strict` (Rule-Based Only)
-*   **Description**: Uses Abstract Syntax Tree (AST) parsing (via `ts-morph`) to transform code deterministically.
-*   **AI Usage**: 0%.
-*   **Pros**: Instant, free, deterministic, privacy-safe.
-*   **Cons**: Fails or comments-out unknown custom commands or complex logic loops.
-*   **Best For**: Security-strict environments, simple CRUD tests.
-
-#### 🧠 Mode 2: `pure-ai` (Full LLM Rewrite)
-*   **Description**: Reads the test file content and prompts an LLM to "Rewrite this entire file in Playwright."
-*   **AI Usage**: 100%.
-*   **Pros**: Handles complex logic, variable scoping, and "intent" better than AST.
-*   **Cons**: Slow, expensive (if using API), risk of "Hallucination" (inventing selectors that don't exist).
-*   **Best For**: Highly complex, messy legacy files that break the AST parser.
-
-#### ⚡ Mode 3: `hybrid` (Default & Recommended)
-*   **Description**:
-    1.  **Pass 1 (AST)**: Convert all standard calls (`visit`, `get`, `click`, `type`) and assertions using rules.
-    2.  **Pass 2 (Scan)**: Identify "Unknown/Untransformed" nodes (e.g., `cy.loginWithSSO()`).
-    3.  **Pass 3 (AI patch)**: Send *only* the specific blocks or lines to the LLM to resolve them into Playwright code.
-*   **AI Usage**: ~10-20%.
-*   **Pros**: Best of both worlds—speed of AST, smarts of LLM.
+Cy2Play automates 80–95% of that work with a **hybrid engine**: fast deterministic AST rules for standard commands, with optional LLM assistance for complex edge cases.
 
 ---
 
-## 3. Detailed Architecture
+## Features
 
-### 3.1 Pipeline Flow
-```mermaid
-graph TD
-    A[Input File .cy.ts] --> B{Mode Selection}
-    B -->|Strict| C[AST Parser]
-    B -->|Pure AI| D[LLM Prompt Engine]
-    B -->|Hybrid| E[AST Parser]
-    
-    C --> F[Transformation Rules]
-    F --> G[Code Generator]
-    
-    E --> F
-    F --> H{Unresolved Nodes?}
-    H -->|Yes| I[LLM Fragment Solver] --> G
-    H -->|No| G
-    
-    D --> G
-    
-    G --> J[Output File .pw.spec.ts]
-    J --> K[Prettier/Linter]
+- ⚡ **Three conversion modes**: `strict` (rules only), `hybrid` (default — AST + AI), `pure-ai` (full LLM rewrite)
+- 🔒 **Local LLM support** — Use Ollama or LM Studio so your code never leaves your machine
+- 🧠 **AST-powered** — Not regex find-and-replace; real syntax tree transformations
+- 📊 **Migration reports** — See what changed, what needs manual review, and estimated AI cost
+- 🎨 **Auto-formatted output** — Prettier integration for clean generated code
+
+---
+
+## Installation
+
+```bash
+npm install -g cy2play
 ```
 
-### 3.2 AI & Local LLM Provider Support
-The system must support pluggable LLM backends via `LangChain`.
+Or use directly with `npx`:
 
-*   **OpenAI**: Standard `gpt-4` or `gpt-3.5-turbo`.
-*   **Anthropic**: `claude-3-opus` (excellent at code).
-*   **Local (Ollama/LM Studio)**:
-    *   **Url**: Configurable (default `http://localhost:11434`).
-    *   **Model**: Configurable (default `llama3` or `codellama`).
-    *   **Context**: Must handle strict system prompts to output *only* code.
-
-### 3.3 Configuration Schema (`cy2play.config.json`)
-```json
-{
-  "mode": "hybrid", 
-  "testFolder": "./cypress/e2e",
-  "outputFolder": "./tests",
-  "ai": {
-    "provider": "ollama", 
-    "model": "llama3",
-    "baseUrl": "http://localhost:11434",
-    "temperature": 0.2
-  },
-  "customCommands": {
-    "login": "await page.login()", 
-    "dataCy": "page.locator(`[data-cy='${args[0]}']`)"
-  }
-}
-```
-
----
-
-## 4. Technical Specifications
-
-### 4.1 AST Transformation Logic (The Hard Part)
-
-#### 4.1.1 Sync to Async Mutation
-Cypress commands are synchronous chains. Playwright is `Promise`-based.
-*   **Input**: `cy.get('.btn').click()`
-*   **Logic**:
-    1.  Identify call chain `get` -> `click`.
-    2.  Split into `locator` and `action`.
-    3.  Wrap in `await`.
-*   **Output**: `await page.locator('.btn').click()`
-
-#### 4.1.2 Scope Hoisting
-*   **Input**:
-    ```javascript
-    cy.get('.item').then($el => {
-        const txt = $el.text();
-        cy.wrap(txt).should('eq', 'hello');
-    })
-    ```
-*   **Output**:
-    ```javascript
-    const el = page.locator('.item');
-    const txt = await el.innerText();
-    expect(txt).toBe('hello');
-    ```
-
-### 4.2 Handling Edge Cases
-
-| Feature | Cypress | Playwright Target | Hybrid Strategy |
-| :--- | :--- | :--- | :--- |
-| **Selectors** | `cy.get('[data-id=1]')` | `page.locator('[data-id=1]')` | Strict Rule |
-| **Route** | `cy.intercept('/api/users')` | `page.route('/api/users', ...)` | LLM (Complex syntax) |
-| **Time** | `cy.wait(5000)` | `await page.waitForTimeout(5000)` | Strict Rule (add warning) |
-| **Assertion** | `.should('be.visible')` | `expect(loc).toBeVisible()` | Strict Rule |
-| **Assertion** | `.should('have.css', 'color', 'red')` | `expect(loc).toHaveCSS(...)` | Strict Rule |
-| **Hooks** | `beforeEach(() => {})` | `test.beforeEach(async ({ page }) => {})` | Strict Rule |
-| **Plugins** | `cy.xpath(...)` | `page.locator('xpath=...')` | Hybrid/LLM |
-
----
-
-## 5. User Experience (CLI)
-
-### 5.1 Commands
-
-**1. Standard Conversion (Hybrid)**
 ```bash
 npx cy2play convert ./cypress/e2e
 ```
 
-**2. Strict Mode (No AI)**
+---
+
+## Quick Start
+
+### 1. Convert a file or directory (hybrid mode — default)
+
 ```bash
-npx cy2play convert ./cypress/e2e --mode=strict
+npx cy2play convert ./cypress/e2e/login.cy.ts
 ```
 
-**3. Local LLM Mode**
+### 2. Strict mode (no AI, instant, free)
+
+```bash
+npx cy2play convert ./cypress/e2e --mode strict
+```
+
+### 3. Use a local LLM (Ollama)
+
 ```bash
 npx cy2play convert ./cypress/e2e \
-  --mode=hybrid \
-  --llm-provider=ollama \
-  --model=codellama
+  --mode hybrid \
+  --provider local \
+  --local-url http://localhost:11434 \
+  --model codellama
 ```
 
-**4. Dry Run & Report**
+### 4. Dry run (preview without writing files)
+
 ```bash
-npx cy2play convert --dry-run
-# Output:
-# ℹ️ Scanned 50 files.
-# ⚠️ 12 files contain custom commands that require AI or manual config.
-# 💰 Estimated Cost (if using OpenAI): $0.45
+npx cy2play convert ./cypress/e2e --dry-run
 ```
 
 ---
 
-## 6. Implementation Stages (Granular)
+## Configuration
 
-### Phase 1: The Strict Engine (Weeks 1-2)
-- [ ] Set up `ts-morph` project.
-- [ ] Implement `SelectorTransformer`: regex/AST replacement for `cy.get`, `cy.contains`.
-- [ ] Implement `ActionTransformer`: `click`, `type`, `check`.
-- [ ] Implement `AssertionTransformer`: Chai `expect` to Jest/Playwright `expect`.
-- [ ] **Deliverable**: CLI converts simple "Hello World" login tests perfectly.
+Create a `cy2play.config.json` in your project root:
 
-### Phase 2: The Async Rewriter (Weeks 3-4)
-- [ ] Implement `ChainBreaker`: Break `cy.get().click().should()` into multiple lines if needed.
-- [ ] Implement `FunctionWrapper`: Automatically add `async` to parenet `it/test` blocks.
-- [ ] Handle `then()` callbacks (unwrapping jQuery objects).
-- [ ] **Deliverable**: Converts standard synchronous Cypress code to valid async/await TS.
+```json
+{
+  "mode": "hybrid",
+  "targetDir": "./playwright-tests",
+  "llm": {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "apiKey": "env:OPENAI_API_KEY",
+    "temperature": 0.2
+  },
+  "localLlm": {
+    "enabled": false,
+    "baseUrl": "http://localhost:11434/v1",
+    "model": "llama3"
+  },
+  "customMappings": {
+    "cy.dataCy": "page.getByTestId"
+  }
+}
+```
 
-### Phase 3: The AI Integration (Weeks 5-6)
-- [ ] Integrate `LangChain`.
-- [ ] Create `OllamaAdapter` and `OpenAIAdapter`.
-- [ ] Implement `HybridOrchestrator`:
-    - If AST fails to map a node -> Mark as `UNKNOWN`.
-    - Collect `UNKNOWN` nodes.
-    - Batch send to LLM: "Translate this Cypress chunk to Playwright".
-    - Stitch result back into file.
-- [ ] **Deliverable**: `--mode=hybrid` works with local Ollama.
+| Option | Type | Default | Description |
+|:---|:---|:---|:---|
+| `mode` | `"strict" \| "hybrid" \| "pure-ai"` | `"hybrid"` | Conversion strategy |
+| `targetDir` | `string` | `"./playwright-tests"` | Output directory |
+| `llm.provider` | `"openai" \| "anthropic" \| "local"` | `"openai"` | LLM backend |
+| `customMappings` | `object` | `{}` | Map custom Cypress commands to Playwright equivalents |
 
-### Phase 4: Polish & Config (Week 7)
-- [ ] Build `cy2play.config.json` loader.
-- [ ] Add `Prettier` pass to format output files.
-- [ ] Add `ReportGenerator` (Markdown summary of changes).
-- [ ] **Deliverable**: Beta release `v0.1.0`.
+---
 
-### Phase 5: "Auto-Fix" (Post-MVP)
-- [ ] Run the generated Playwright test.
-- [ ] If it fails -> Feed error + code back to LLM.
-- [ ] "Self-Heal" the migration.
+## How It Works
+
+```
+Input (.cy.ts) → AST Parser → Transformation Rules → [LLM for unknowns] → Code Generator → Prettier → Output (.spec.ts)
+```
+
+1. **Strict mode** — Deterministic AST transformation for known commands (`cy.get`, `cy.visit`, `.click()`, `.should()`).
+2. **Hybrid mode** — AST handles ~85% of conversions; unknown/complex blocks are sent as snippets to an LLM.
+3. **Pure AI mode** — The entire file is sent to an LLM for rewriting.
+
+See [PRD.md](PRD.md) for detailed architecture and specifications.
+
+---
+
+## Example Conversion
+
+**Input** (`login.cy.ts`):
+```typescript
+describe('Login', () => {
+  beforeEach(() => {
+    cy.visit('/login');
+  });
+
+  it('should log in successfully', () => {
+    cy.get('[data-cy=email]').type('user@test.com');
+    cy.get('[data-cy=password]').type('password123');
+    cy.get('[data-cy=submit]').click();
+    cy.url().should('include', '/dashboard');
+  });
+});
+```
+
+**Output** (`login.spec.ts`):
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Login', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
+  });
+
+  test('should log in successfully', async ({ page }) => {
+    await page.locator('[data-cy=email]').fill('user@test.com');
+    await page.locator('[data-cy=password]').fill('password123');
+    await page.locator('[data-cy=submit]').click();
+    await expect(page).toHaveURL(/dashboard/);
+  });
+});
+```
+
+---
+
+## Development
+
+```bash
+# Clone the repo
+git clone https://github.com/your-username/cy2play.git
+cd cy2play
+
+# Install dependencies
+npm install
+
+# Run in dev mode
+npm run dev -- convert ./path/to/cypress/tests
+
+# Build
+npm run build
+
+# Run tests
+npm test
+```
+
+---
+
+## Roadmap
+
+See [PROGRESS.md](PROGRESS.md) for the detailed engineering roadmap and task tracking.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please open an issue to discuss your idea before submitting a PR.
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Commit your changes
+4. Push and open a PR
+
+---
+
+## License
+
+[ISC](LICENSE)

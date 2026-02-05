@@ -203,32 +203,6 @@ Stats:
 
 ---
 
-## 7. Roadmap & Phases
+## 7. Engineering Roadmap
 
-### Phase 1: The Foundation (Strict Mode)
--   [ ] Set up TypeScript Monorepo / Project Structure.
--   [ ] Implement CLI entry point.
--   [ ] Implement `AST Parser` using `ts-morph` or Babel.
--   [ ] Build `StrictTransformer`:
-    -   Basic mappings (`visit`, `get`, `click`, `type`).
-    -   Assertion mappings (`should`).
--   [ ] Output file generation.
-
-### Phase 2: LLM Integration (Pure AI)
--   [ ] Implement `LLMClient` interface.
--   [ ] Add `OpenAIProvider`.
--   [ ] Add `LocalLLMProvider` (generic fetch wrapper).
--   [ ] Implement `PureAIStrategy` (Send full file text).
--   [ ] Add System Prompts implementation (separation of prompts from code).
-
-### Phase 3: The Hybrid Engine
--   [ ] Update AST Walker to identify "Safe" vs "Unsafe" nodes.
--   [ ] Implement Context Extractor (Grab line numbers for unknown nodes).
--   [ ] Stitching logic: Merge AST-transformed code with LLM-returned snippets.
--   [ ] Handling `cy.intercept` and `cy.wait` specifically.
-
-### Phase 4: Polish & Refinement
--   [ ] `cy2play.config.json` support.
--   [ ] Prettier integration for formatted output.
--   [ ] Batch processing (folders).
--   [ ] Comparison/Diff view (optional).
+> For the detailed, tracked engineering roadmap with task status, see [PROGRESS.md](PROGRESS.md).
