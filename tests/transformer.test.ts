@@ -214,11 +214,11 @@ describe('Transformer — edge cases', () => {
     expect(result.stats.totalCommands).toBeGreaterThan(0);
   });
 
-  it('should mark cy.then as complex / TODO', () => {
+  it('should convert cy.get().then(($el) => { ... }) to page.evaluate', () => {
     const input = `cy.get('.el').then(($el) => { console.log($el); });`;
     const result = transformFile(input, 'then.cy.ts');
-    expect(result.code).toContain('TODO');
-    expect(result.unresolvedNodes.length).toBeGreaterThan(0);
+    expect(result.code).toContain('page.evaluate');
+    expect(result.code).toContain("document.querySelector('.el')");
   });
 
   it('should handle static cy.wait(ms) with warning', () => {

@@ -191,9 +191,9 @@ export const COMPLEX_COMMANDS: Set<string> = new Set([
   'exec',
   'readFile',
   'writeFile',
-  'fixture',
+  // 'fixture' — handled by transformer (import + unwrap)
   'wrap',
-  'request',
+  // 'request' — handled by transformer (multi-line block → Playwright request API)
   'getCookie',
   'getCookies',
   'setCookie',
@@ -201,14 +201,14 @@ export const COMPLEX_COMMANDS: Set<string> = new Set([
   'clearCookies',
   'screenshot',
   'viewport',
-  'window',
+  // 'window' — handled by transformer (dialog/stub patterns)
   'document',
   'then',  // callback unwrapping is complex
   'each',  // iteration pattern differs
-  'within', // scoped context
+  // 'within' — handled by transformer (scoped locator)
   'shadow', // shadow DOM access
   'its',   // property access pattern
-  'invoke', // method invocation pattern
+  // 'invoke' — handled by transformer (evaluate/inputValue)
 ]);
 
 /**

@@ -13,7 +13,9 @@
 //   Final  — Run Prettier to normalize formatting
 // ============================================================================
 
-import { transformFile } from './transformer';
+import * as fs from 'fs';
+import * as path from 'path';
+import { transformFile, parseCustomCommands, CustomCommandDef } from './transformer';
 import { createLLMClient } from './ai/index';
 import { pureAITransform } from './ai/pure-ai-strategy';
 import { SnippetCache } from './ai/cache';
@@ -38,6 +40,23 @@ export interface OrchestratorOptions {
   client?: LLMClient;
   /** Shared snippet cache (optional) */
   cache?: SnippetCache;
+  /** Pre-parsed custom command definitions (optional — auto-detected if not provided) */
+  customCommands?: CustomCommandDef[];
+}
+
+/** Walk up from a file path to find the project root (where cypress/ lives) and parse custom commands */
+function detectCustomCommands(filePath: string): CustomCommandDef[] {
+  let dir = path.dirname(path.resolve(filePath));
+  // Walk up at most 5 levels looking for a cypress/ directory
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(dir, 'cypress'))) {
+      return parseCustomCommands(dir);
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return [];
 }
 
 /**
@@ -54,15 +73,18 @@ export async function orchestrate(
 ): Promise<TransformResult> {
   const { options } = orchOptions;
 
+  // Auto-detect custom commands from cypress/support/commands.ts
+  const customCommands = orchOptions.customCommands ?? detectCustomCommands(filePath);
+
   switch (options.mode) {
     case 'strict':
-      return transformFile(sourceCode, filePath);
+      return transformFile(sourceCode, filePath, customCommands);
 
     case 'pure-ai':
       return runPureAI(sourceCode, filePath, orchOptions);
 
     case 'hybrid':
-      return runHybrid(sourceCode, filePath, orchOptions);
+      return runHybrid(sourceCode, filePath, orchOptions, customCommands);
 
     default:
       throw new Error(`Unknown conversion mode: "${options.mode}"`);
@@ -96,6 +118,7 @@ async function runHybrid(
   sourceCode: string,
   filePath: string,
   orchOptions: OrchestratorOptions,
+  customCommands?: CustomCommandDef[],
 ): Promise<TransformResult> {
   const startTime = Date.now();
   const debug = orchOptions.options.debug;
@@ -103,7 +126,7 @@ async function runHybrid(
   // ── Pass 1: Strict transformation ──────────────────────────────────────
   if (debug) console.log(`  [hybrid] Pass 1: Running strict transformer on ${filePath}...`);
 
-  const strictResult = transformFile(sourceCode, filePath);
+  const strictResult = transformFile(sourceCode, filePath, customCommands);
   const allWarnings: Warning[] = [...strictResult.warnings];
 
   // If there are no unresolved nodes, we're done — no AI needed
