@@ -160,8 +160,8 @@ test.describe('Login', () => {
 ## Development
 
 ```bash
-# Clone the repo
-git clone https://github.com/your-username/cy2play.git
+# Clone the repo (replace with your fork URL if contributing)
+git clone https://github.com/barispe/cy2play.git
 cd cy2play
 
 # Install dependencies
