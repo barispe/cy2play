@@ -115,7 +115,6 @@ Input (.cy.ts) → AST Parser → Transformation Rules → [LLM for unknowns] �
 2. **Hybrid mode** — AST handles ~85% of conversions; unknown/complex blocks are sent as snippets to an LLM.
 3. **Pure AI mode** — The entire file is sent to an LLM for rewriting.
 
-See [PRD.md](PRD.md) for detailed architecture and specifications.
 
 ---
 
@@ -181,9 +180,11 @@ npm test
 
 ## Roadmap
 
-See [PROGRESS.md](PROGRESS.md) for the detailed engineering roadmap and task tracking.
-
----
+- [ ] `cy2play init` command to scaffold configuration
+- [ ] Split transformer engine into smaller modules
+- [ ] Plugin system for custom transformation rules
+- [ ] VS Code extension
+- [ ] Batch migration dashboard
 
 ## Contributing
 
